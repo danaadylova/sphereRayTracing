@@ -4,7 +4,6 @@ public class ColoredSphere extends Sphere{
 	private color color;
 	private double reflectionFactor;
 	private boolean isLightSphere;
-	private boolean isHollowSphere; // not included in the constructor
 	
 	public ColoredSphere() {
 		vector cen = new vector(0,0,0);
@@ -12,7 +11,6 @@ public class ColoredSphere extends Sphere{
 		this.setRadius(0);
 		this.setFactor(0);
 		this.isLightSphere = false;
-		this.isHollowSphere = false;
 	}
 	
 	public ColoredSphere(vector cen, color col, double rad, double reflFac, boolean isLight) {
@@ -34,10 +32,7 @@ public class ColoredSphere extends Sphere{
 	public boolean isLightSphere() {
 		return this.isLightSphere;
 	}
-	
-	public boolean isHollowSphere() {
-		return this.isHollowSphere;
-	}
+
 	
 	public void setColor(color col) {
 		color = col;
@@ -51,8 +46,6 @@ public class ColoredSphere extends Sphere{
 		this.isLightSphere = isLight;
 	}
 	
-	public void setIsHollow(boolean isHollow) {
-		this.isHollowSphere = isHollow;
-	}
+
 
 }

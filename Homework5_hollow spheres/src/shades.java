@@ -10,21 +10,6 @@ import java.awt.image.BufferedImage;
 
 public class shades {
 	
-//	public static boolean originRayHitSphere(vector ray, Sphere sph) {
-//		double lengthRay = vector.vectorLength(ray);
-//		double centerLength = vector.vectorLength(sph.getCenter());
-//		double cos = (ray.getX()*sph.getCenter().getX()+ray.getY()*sph.getCenter().getY()+ray.getZ()*sph.getCenter().getZ())/(lengthRay*centerLength);
-//		double d;
-//		if (cos>=0)
-//			d = centerLength*Math.sqrt(1-cos*cos);
-//		else
-//			return false;
-//		if (d>=sph.getRadius()) {
-//			return false;
-//		}
-//		return true;
-//	}
-	
 	public static vector hitPoint(vector origin, vector ray, Sphere sph) {
 		vector q = new vector (-origin.getX()+sph.getCenter().getX(), -origin.getY()+sph.getCenter().getY(), -origin.getZ()+sph.getCenter().getZ());
 		double lengthRay = vector.vectorLength(ray);
@@ -44,50 +29,26 @@ public class shades {
 		return hit;
 	}
 	
-	public static boolean sphereInFront(vector ray, Object[] spheres, int currentSphereIndex) {
-		Sphere currentSphere = (Sphere)spheres[currentSphereIndex];
-		vector origin = new vector (0,0,0);
-		vector currentHit = hitPoint(origin, ray, currentSphere);
-		if (currentHit == null)
-			return false;
-		double currentHitLength = vector.vectorLength(currentHit);
-		for (int i = 0; i<4; i++) {
-			if (i!= currentSphereIndex) {
-				Sphere checkSphere = (Sphere) spheres[i];
-				if (normal(ray, checkSphere)!=null) {
-					vector hitPoint = hitPoint(origin, ray, checkSphere);
-					double hitLength = vector.vectorLength(hitPoint);
-					if (hitLength<currentHitLength)  // DOES NOT INCLUDE SPHERES THAT ARE NOT SEEN
-						return true;
-				}
-			}
-		}
-		return false;
-	}
-	
 	public static boolean sphereUp (vector ray, Object[] spheres, int currentSphereIndex) {
 		Sphere currentSphere = (Sphere)spheres[currentSphereIndex];
 		vector origin = new vector (0,0,0);
-		vector hitPoint = hitPoint(origin, ray, currentSphere);
-		if (hitPoint == null)
+		vector hitpoint = hitPoint(origin, ray, currentSphere);
+		if (hitpoint == null)
 			return false;
 		vector n = new vector(0, 1, 0);
-		for (int i = 0; i<4; i++) {
-			if (i!=currentSphereIndex) {
-				Sphere checkSphere = (Sphere) spheres[i];
-				// hitSph is a vector that starts at normal start and ends at the checking sphere center
-				vector hitSph = new vector(checkSphere.getCenter().getX()-hitPoint.getX(), checkSphere.getCenter().getY()-hitPoint.getY(), checkSphere.getCenter().getZ()-hitPoint.getZ());
-				double hitSphLength = vector.vectorLength(hitSph);
-				double cos = (hitSph.getX()*n.getX()+hitSph.getY()*n.getY()+hitSph.getZ()*n.getZ())/(hitSphLength);
-				double d;
-				if (cos>=0){
-					d = hitSphLength*Math.sqrt(1-cos*cos);
-					if (d < checkSphere.getRadius())
-						return true;
-				}
+		int whichSphere = getIndexIfRayHitsSphere(hitpoint, n, spheres, currentSphereIndex);
+		if ((whichSphere>=0) && (whichSphere<spheres.length)){
+			ColoredSphere HitSphere = (ColoredSphere)spheres[whichSphere];
+			if (HitSphere.isLightSphere()) {
+				return false;
 			}
+			else {
+				return true;
+			}
+			
 		}
-		return false;
+		else
+			return false;
 	}
 	
 	public static vector normal(vector ray, Sphere sph) {
@@ -117,29 +78,20 @@ public class shades {
 		vector reflected = new vector(hitpoint.getX()-2.0*c1*normal.getX(), hitpoint.getY()-2.0*c1*normal.getY(), hitpoint.getZ()-2.0*c1*normal.getZ());
 		
 		vector mirroredPoint = null;
-		int mirroredSphereIndex = -1;
 		
-		for (int i=0; i<spheres.length; i++){ // Determines if reflected ray hits sphere, and which sphere
-			if (i!=currentSphereIndex) {
-				if (hitPoint(hitpoint, reflected, (Sphere)spheres[i]) != null) {
-					if (mirroredPoint == null){
-						mirroredPoint = hitPoint(hitpoint, reflected, (Sphere)spheres[i]);
-						mirroredSphereIndex = i;
-					}
-					else if (vector.vectorLength(mirroredPoint) > vector.vectorLength(hitPoint(hitpoint, reflected, (Sphere)spheres[i]))) {
-						mirroredPoint = hitPoint(hitpoint, reflected, (Sphere)spheres[i]);
-						mirroredSphereIndex = i;
-					}
-				}
-			}
+		int whichSphere = getIndexIfRayHitsSphere(hitpoint, reflected, spheres, currentSphereIndex);
+		if (whichSphere == -1) {
+			rayColor.setRed(0);
+			rayColor.setGreen(0.2*(1-normal.getY())*255.0);
+			rayColor.setBlue(0.1*255.0);
 		}
-		
-		if (mirroredPoint != null) {
-			ColoredSphere mirroredSphere = (ColoredSphere)spheres[mirroredSphereIndex];
+		else if (whichSphere>=0 && whichSphere<spheres.length) {
+			mirroredPoint = hitPoint(hitpoint, reflected, (Sphere)spheres[whichSphere]);
+			ColoredSphere mirroredSphere = (ColoredSphere)spheres[whichSphere];
 			if (mirroredSphere.isLightSphere() == false) { // reflected ray hits colored sphere
 				double mirroredPointLength = vector.vectorLength(mirroredPoint);
 				vector mirroredPointNormalized = new vector(mirroredPoint.getX()/mirroredPointLength, mirroredPoint.getY()/mirroredPointLength, mirroredPoint.getZ()/mirroredPointLength);
-				boolean isSphereUp = sphereUp(mirroredPointNormalized, spheres, mirroredSphereIndex);
+				boolean isSphereUp = sphereUp(mirroredPointNormalized, spheres, whichSphere);
 				if (!isSphereUp) { // if reflected ray hits some sphere and does not hit shaded region
 					vector reflectedNormalNotNormalized = new vector(mirroredPoint.getX()-mirroredSphere.getCenter().getX(), 
 							mirroredPoint.getY()-mirroredSphere.getCenter().getY(), 
@@ -160,17 +112,11 @@ public class shades {
 				rayColor.setGreen(255.0);
 				rayColor.setRed(255.0);
 			}
-			
-		}
-		else { // reflected ray hits void
-			rayColor.setRed(0);
-			rayColor.setGreen(0.2*(1-normal.getY())*255.0);
-			rayColor.setBlue(0.1*255.0);
 		}
 		return rayColor;
 	}
 
-	public static int getHitSphere(vector origin, vector ray, Object[] spheres, int currentSphereIndex){
+	public static int getIndexIfRayHitsSphere(vector origin, vector ray, Object[] spheres, int currentSphereIndex){
 		int index = -1;
 		for (int i = 0; i<spheres.length; i++) {
 			if (i!= currentSphereIndex) {
@@ -197,86 +143,114 @@ public class shades {
 		return index;
 	}
 	
-	public static color getRefractedColor(vector ray, Object[] spheres, int currentSphereIndex, double refractionIndex){
+	/**public static color getRefractedColor(vector origin, vector ray, Object[] spheres, int hitSphereIndex, double refractionIndex){
 		color rayColor = new color(0,0,0); // Reflected color that will be returned
-		vector origin = new vector (0,0,0);
-		vector hitpoint = hitPoint(origin, ray, (Sphere)spheres[currentSphereIndex]);
+		vector refracted = getRefractedVector(origin, ray, spheres, hitSphereIndex, refractionIndex);
+		vector originRefracted = new vector (origin.getX()+ray.getX(), origin.getY()+ray.getY(), origin.getZ()+ray.getZ());
+		vector hitPoint = hitPoint(origin, ray, (Sphere)spheres[hitSphereIndex]);
+		vector normal = normal(hitPoint, (Sphere)spheres[hitSphereIndex]);
+		int whichSphere = getIndexIfRayHitsSphere(originRefracted, refracted, spheres, hitSphereIndex);
+		if (whichSphere == -1) { // hits void
+			rayColor.setRed(0);
+			rayColor.setGreen(0.2*(1-normal.getY())*255.0);
+			rayColor.setBlue(0.1*255.0);
+		}
+		else if (whichSphere>=0 && whichSphere<spheres.length) { // hits some sphere
+			vector refrPoint = hitPoint(originRefracted, refracted, (Sphere)spheres[whichSphere]);
+			ColoredSphere refractedHitSphere = (ColoredSphere)spheres[whichSphere];
+			if (refractedHitSphere.isLightSphere() == false) { // reflected ray hits colored sphere
+				double refrPointLength = vector.vectorLength(refrPoint);
+				vector refrPointNormalized = new vector(refrPoint.getX()/refrPointLength, 
+						refrPoint.getY()/refrPointLength, refrPoint.getZ()/refrPointLength);
+				boolean isSphereUp = sphereUp(refrPointNormalized, spheres, whichSphere);
+				if (!isSphereUp) { // if refracted ray hits some sphere and does not hit shaded region
+					vector refractedNormalNotNormalized = new vector(refrPoint.getX()-refractedHitSphere.getCenter().getX(), 
+							refrPoint.getY()-refractedHitSphere.getCenter().getY(), 
+							refrPoint.getZ()-refractedHitSphere.getCenter().getZ());//normal(mirroredPointNormalized, mirroredSphere);
+					double reflectedNormalNotNormalizedLength = vector.vectorLength(refractedNormalNotNormalized);
+					vector reflectedNormal = new vector(refractedNormalNotNormalized.getX()/reflectedNormalNotNormalizedLength, 
+							refractedNormalNotNormalized.getY()/reflectedNormalNotNormalizedLength, 
+							refractedNormalNotNormalized.getZ()/reflectedNormalNotNormalizedLength);
+					if (reflectedNormal.getY()>0) {
+						rayColor.setBlue(refractedHitSphere.getColor().getBlue()*255.0*reflectedNormal.getY());
+						rayColor.setGreen(refractedHitSphere.getColor().getGreen()*255.0*reflectedNormal.getY());
+						rayColor.setRed(refractedHitSphere.getColor().getRed()*255.0*reflectedNormal.getY());
+					}
+				}
+			}
+			else { // refracted ray hits light sphere
+				rayColor.setBlue(255.0);
+				rayColor.setGreen(255.0);
+				rayColor.setRed(255.0);
+			}
+		}
+		return rayColor;
+	}
+	
+	public static vector getRefractedVector(vector origin, vector ray, Object[] spheres, int hitSphereIndex, double refractionIndex) {
+		vector refracted = null;
+		vector hitpoint = hitPoint(origin, ray, (Sphere)spheres[hitSphereIndex]);
 		if (hitpoint==null){
 			System.out.println("Hitpoint");
 			return null;
 		}
-		vector normal = normal(ray, (Sphere)spheres[currentSphereIndex]);
+		vector normal = normal(ray, (Sphere)spheres[hitSphereIndex]);
 		double c1 = hitpoint.getX()*normal.getX()+hitpoint.getY()*normal.getY()+hitpoint.getZ()*normal.getZ();
 		double c2 = Math.sqrt(1- refractionIndex*refractionIndex*(1 - c1*c1));
-		vector refracted = new vector(refractionIndex*hitpoint.getX()+(refractionIndex*c1-c2)*normal.getX(),
+		refracted = new vector(refractionIndex*hitpoint.getX()+(refractionIndex*c1-c2)*normal.getX(),
 				refractionIndex*hitpoint.getY()+(refractionIndex*c1-c2)*normal.getY(),
 				refractionIndex*hitpoint.getZ()+(refractionIndex*c1-c2)*normal.getZ()); //Rr = (n * V) + (n * c1 - c2) * N
-		
-//		while ()
-		return rayColor;
+		return refracted;
 	}
+	**/
 	
 	public static void sphereRayTracingShades(BufferedImage image, Object[] spheres){
 		int width = image.getWidth();
 		int height = image.getHeight();
+		vector origin = new vector(0,0,0);
 		try {
 			for (int i = 0; i < height; i++) {
 				for (int j = 0; j < width; j++) {
 					vector ray = new vector(-1.0+2.0*j/((double)width), 1.0-2.0*i/((double)height), -1.0);
 					color rayColor = new color(0,0,0); // color that will be displayed
-					int whichSphere = 
-//					boolean hitsSomeSphere = false;
-//					for (int l=0; l<spheres.length; l++){
-//						if (originRayHitSphere(ray,(Sphere)spheres[l])) {
-//							hitsSomeSphere = true;
-//						}
-//					}
-					
-					if (hitsSomeSphere) {
-						for (int k = 0; k < spheres.length; k++) {
-							ColoredSphere currentSphere = (ColoredSphere)spheres[k]; // the sphere that ray hits
-							if (originRayHitSphere(ray,currentSphere)){ // if this ray hits sphere
-								
-								if (currentSphere.isLightSphere() == false) {
-									if (!sphereInFront(ray,spheres,k) && (currentSphere.getFactor()<1.0)) { // If there is no sphere in front and this is not a mirror
-										if (!sphereUp(ray, spheres, k)) { // if there is no sphere up
-											vector norm = normal(ray, currentSphere);
-											if (norm.getY()>0) {
-												rayColor.setRed(currentSphere.getColor().getRed()*norm.getY()*255.0);
-												rayColor.setGreen(currentSphere.getColor().getGreen()*norm.getY()*255.0);
-												rayColor.setBlue(currentSphere.getColor().getBlue()*norm.getY()*255.0);
-											}
-											else {
-												rayColor.setRed(0);
-												rayColor.setBlue(0);
-												rayColor.setGreen(0);
-											}
-										}
-										else { // if there is sphere up
-											rayColor.setRed(0);
-											rayColor.setBlue(0);
-											rayColor.setGreen(0);
-										}
-									}
-									else if (!sphereInFront(ray,spheres,k) && (currentSphere.getFactor() == 1.0)) { // if there is no sphere in front and it is a mirror
-										rayColor = getMirroredColor(ray, spheres, k);
-									}
-									else if (!sphereInFront(ray,spheres,k) && currentSphere.isHollowSphere()) {
-										rayColor = getRefractedColor(ray, spheres, k, 1.51);
-									}
-								}
-								else if (currentSphere.isLightSphere() && !sphereInFront(ray,spheres,k)){ // Hits light sphere
-									rayColor.setRed(255.0);
-									rayColor.setGreen(255.0);
-									rayColor.setBlue(255.0);
-								}
-							}
-						}
-					}
-					else {
+					int whichSphere = getIndexIfRayHitsSphere(origin, ray, spheres, -1); // gets index of the sphere that the ray hits. -1 if it is void
+					if (whichSphere == -1){ // ray hits void
 						rayColor.setRed(0);
 						rayColor.setGreen(0.2*(1.0-ray.getY())*255.0);
 						rayColor.setBlue(0.1*255.0);
+					}
+					else if (whichSphere>=0 && whichSphere<spheres.length) { // ray hits some sphere
+						ColoredSphere currentSphere = (ColoredSphere)spheres[whichSphere];
+						if (!currentSphere.isLightSphere()) { // if it is not a light sphere
+							if (currentSphere.getFactor()<1.0) { // If this is not a mirror
+								if (!sphereUp(ray, spheres, whichSphere)) { // if there is no sphere up
+									vector norm = normal(ray, currentSphere);
+									if (norm.getY()>0) {
+										rayColor.setRed(currentSphere.getColor().getRed()*norm.getY()*255.0);
+										rayColor.setGreen(currentSphere.getColor().getGreen()*norm.getY()*255.0);
+										rayColor.setBlue(currentSphere.getColor().getBlue()*norm.getY()*255.0);
+									}
+									else {
+										rayColor.setRed(0);
+										rayColor.setBlue(0);
+										rayColor.setGreen(0);
+									}
+								}
+								else { // if there is sphere up
+									rayColor.setRed(0);
+									rayColor.setBlue(0);
+									rayColor.setGreen(0);
+								}
+							}
+							else if (currentSphere.getFactor() == 1.0) { // if it is a mirror
+								rayColor = getMirroredColor(ray, spheres, whichSphere);
+							}
+						}
+						else{ // Hits light sphere
+							rayColor.setRed(255.0);
+							rayColor.setGreen(255.0);
+							rayColor.setBlue(255.0);
+						}
 					}
 					int r = (int)rayColor.getRed();
 					int g = (int)rayColor.getGreen();
@@ -295,7 +269,7 @@ public class shades {
 		BufferedImage image = new BufferedImage (2000, 2000, BufferedImage.TYPE_INT_RGB);
 		vector oneCenter = new vector(0, 0, -3);
 		color oneColor = new color(1.0, 0.5, 0.5);
-		ColoredSphere one = new ColoredSphere(oneCenter, oneColor, 1.0, 0.0, false);
+		ColoredSphere one = new ColoredSphere(oneCenter, oneColor, 1.0, 1.0, false);
 		vector twoCenter = new vector(2, 0, -4);
 		color twoColor = new color(0.5, 1, 0.5);
 		ColoredSphere two = new ColoredSphere(twoCenter, twoColor, 1, 0.0, false);
@@ -305,22 +279,16 @@ public class shades {
 		vector fourCenter = new vector(0, -100, 0);
 		color fourColor = new color(1, 1, 1);
 		ColoredSphere four = new ColoredSphere(fourCenter, fourColor, 98.5, 0, false);
-//		vector fiveCenter = new vector(0, 10, 0);
-//		ColoredSphere five = new ColoredSphere(fiveCenter, oneColor, 1.0, 0, true);
-		vector hollowCenter = new vector(0,0,-2);
-		ColoredSphere hollowOne = new ColoredSphere(hollowCenter, oneColor, 1.0, 0.0, false);
-		ColoredSphere hollowTwo = new ColoredSphere(hollowCenter, oneColor, 0.9, 0.0, false);
-		hollowOne.setIsHollow(true);
-		hollowTwo.setIsHollow(true);
+		vector fiveCenter = new vector(0, 10, 0);
+		ColoredSphere five = new ColoredSphere(fiveCenter, oneColor, 1.0, 0, true);
 
-		Object[] spheres = new Object[6];
+
+		Object[] spheres = new Object[5];
 		spheres[0]=one; 
 		spheres[1]=two;
 		spheres[2]=three;
 		spheres[3]=four;
-//		spheres[4]=five;
-		spheres[4] = hollowOne;
-		spheres[5] = hollowTwo;
+		spheres[4]=five;
 		sphereRayTracingShades(image, spheres);
 		}
 	
